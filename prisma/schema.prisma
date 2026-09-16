@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(EDITOR)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum IPOType {
+  MAINBOARD
+  SME
+}
+
+enum IPOStatus {
+  UPCOMING
+  OPEN
+  CLOSING_TODAY
+  CLOSED
+  LISTED
+}
+
+enum GMPTrend {
+  UP
+  DOWN
+  FLAT
+}
+
+model IPO {
+  id                     String    @id @default(cuid())
+  name                   String
+  slug                   String    @unique
+  company                String
+  logo                   String?
+  type                   IPOType   @default(MAINBOARD)
+
+  priceBandMin           Int
+  priceBandMax           Int
+  lotSize                Int
+  issueSizeCr            Decimal   @db.Decimal(12, 2)
+
+  gmp                    Int       @default(0)
+  gmpTrend               GMPTrend  @default(FLAT)
+
+  expectedSubscription   Decimal?  @db.Decimal(8, 2)
+  estimatedListing       Int?
+
+  openDate               DateTime
+  closeDate              DateTime
+  allotmentDate          DateTime?
+  refundDate             DateTime?
+  demateDate             DateTime?
+  listingDate            DateTime?
+
+  status                 IPOStatus @default(UPCOMING)
+
+  registrar              String?
+  registrarUrl           String?
+  leadManagers           String[]
+
+  about                  String?
+  strengths              String[]
+  risks                  String[]
+
+  // Provenance — every ingested record must carry these
+  source                 String
+  sourceUrl              String
+  lastUpdated            DateTime  @default(now())
+  isStale                Boolean   @default(false)
+
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  gmpHistory             GMPHistory[]
+  subscriptions          Subscription[]
+  articles               Article[]        @relation("ArticleToIPO")
+  reviews                Review[]
+
+  @@index([status])
+  @@index([openDate])
+  @@index([closeDate])
+}
+
+model GMPHistory {
+  id        String   @id @default(cuid())
+  ipoId     String
+  ipo       IPO      @relation(fields: [ipoId], references: [id], onDelete: Cascade)
+  gmp       Int
+  timestamp DateTime @default(now())
+  source    String
+
+  @@index([ipoId, timestamp])
+}
+
+model Subscription {
+  id         String   @id @default(cuid())
+  ipoId      String
+  ipo        IPO      @relation(fields: [ipoId], references: [id], onDelete: Cascade)
+  day        Int
+  qib        Decimal  @db.Decimal(8, 2)
+  nii        Decimal  @db.Decimal(8, 2)
+  retail     Decimal  @db.Decimal(8, 2)
+  employee   Decimal? @db.Decimal(8, 2)
+  total      Decimal  @db.Decimal(8, 2)
+  timestamp  DateTime @default(now())
+  source     String
+
+  @@index([ipoId, day])
+}
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ArticleCategory {
+  NEWS
+  ANALYSIS
+  GMP_UPDATE
+  GUIDE
+  ALLOTMENT_GUIDE
+}
+
+model Article {
+  id          String          @id @default(cuid())
+  title       String
+  slug        String          @unique
+  excerpt     String
+  content     String
+  image       String?
+  category    ArticleCategory @default(NEWS)
+
+  source      String
+  sourceUrl   String
+  lastUpdated DateTime        @default(now())
+
+  publishedAt DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  status      ArticleStatus   @default(DRAFT)
+
+  relatedIpos IPO[]           @relation("ArticleToIPO")
+
+  @@index([status, publishedAt])
+  @@index([category])
+}
+
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+model Review {
+  id           String    @id @default(cuid())
+  ipoId        String
+  ipo          IPO       @relation(fields: [ipoId], references: [id], onDelete: Cascade)
+  sentiment    Sentiment
+  positivePct  Int
+  neutralPct   Int
+  negativePct  Int
+  reviewCount  Int
+  publishedAt  DateTime  @default(now())
+
+  source       String
+  sourceUrl    String
+  lastUpdated  DateTime  @default(now())
+  isStale      Boolean   @default(false)
+
+  @@index([ipoId])
+}
+
+enum DataSourceKind {
+  GMP
+  IPO_LISTING
+  SUBSCRIPTION
+  ARTICLE
+  REVIEW
+  ALLOTMENT
+}
+
+model DataSource {
+  id          String         @id @default(cuid())
+  name        String
+  kind        DataSourceKind
+  baseUrl     String
+  enabled     Boolean        @default(true)
+  config      Json?
+  lastSuccess DateTime?
+  lastFailure DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model AllotmentSource {
+  id        String  @id @default(cuid())
+  registrar String
+  url       String
+  ipoSlug   String?
+  note      String?
+  enabled   Boolean @default(true)
+}
+
+enum UpdateLogStatus {
+  SUCCESS
+  PARTIAL
+  FAILURE
+}
+
+model UpdateLog {
+  id           String          @id @default(cuid())
+  job          String
+  status       UpdateLogStatus
+  message      String?
+  recordsTouched Int           @default(0)
+  startedAt    DateTime        @default(now())
+  finishedAt   DateTime?
+}
