@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "commonjs",
+    "moduleResolution": "node",
     "lib": [
       "ES2022"
     ],
@@ -14,16 +15,17 @@
     "resolveJsonModule": true,
     "declaration": false,
     "sourceMap": false,
+    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "./src/*"
+        "src/*"
       ]
     },
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
   "include": [
-    "src"
+    "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",
